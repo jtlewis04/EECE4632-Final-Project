@@ -26,7 +26,7 @@ class ScoreBoard:
 
     def brick_hit(self):
         self.combo = min(self.combo + 1, self.combo_max)
-        points = self.base_points * (2 ** (self.combo - 1))
+        points = self.combo
         self.score += points
 
     def reset_combo(self):

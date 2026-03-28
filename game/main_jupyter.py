@@ -112,11 +112,6 @@ while running:
             bricks.reset_all()
             gameover = True
 
-        # ── get AI state vector ────────────────────────────────────────────────
-        state = encode_game(ball, pad, bricks, score)
-        # TODO: feed `state` to your AI model here to get action
-        # action = model.predict(state)  →  -1 (left), 0 (stay), 1 (right)
-
         # ── paddle control: PYNQ buttons → widget buttons → AI ───────────────
         if USE_PYNQ_BUTTONS:
             if btn0.read():
@@ -130,7 +125,6 @@ while running:
             if move_left_flag[0]:
                 pad.move_left()
                 move_left_flag[0] = False
-            # TODO: replace above with AI action once model is integrated
 
     else:
         score.game_over()
