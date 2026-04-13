@@ -1,10 +1,31 @@
-# evaluate.py — Watch a saved OS-ELM agent play Breakout
+# board_evaluate.py — Watch a saved OS-ELM agent play Breakout on AUP-ZU3
+#
+# Runs in a Jupyter notebook. Renders via ipywidgets.Image.
+# Uses software inference (numpy), not the FPGA overlay, so no
+# bitstream is needed — just a saved .npz weight file.
+#
+# Usage (in a notebook cell):
+#   %run board_evaluate.py oselm_ep-27.3score.npz
+
+# Headless pygame (BEFORE any pygame import)
+import os
+os.environ["SDL_VIDEODRIVER"] = "dummy"
+os.environ["SDL_AUDIODRIVER"] = "dummy"
+
+# Path setup
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "game"))
+
+_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(_root / "game"))
+sys.path.insert(0, str(_root / "ai" / "software"))
 
 import pygame as pg
 import numpy as np
+from IPython.display import display
+from PIL import Image
+import io
+import ipywidgets as widgets
 
 from ball import Ball
 from bricks import Bricks
@@ -15,20 +36,35 @@ from encoder import encode_game as extract_state, STATE_DIM
 from os_elm_dqn import OSELM_QNetwork
 from training_config import HIDDEN_DIM, NUM_ACTIONS, MAX_STEPS, REG, EPS1
 
-WEIGHTS_DIR  = Path(__file__).parent.parent.parent / "weights"
+# Configuration
+WEIGHTS_DIR  = _root / "weights"
 WEIGHTS_PATH = str(WEIGHTS_DIR / sys.argv[1]) if len(sys.argv) > 1 else str(WEIGHTS_DIR / "oselm_ep5000.npz")
 NUM_EPISODES = 3
+FRAME_SKIP   = 2   # render every Nth frame (raise to speed up)
 
-# ── Load network ────────────────────────────────────────────
+# Load network
 q_net = OSELM_QNetwork(STATE_DIM, HIDDEN_DIM, NUM_ACTIONS, REG)
 q_net.load(WEIGHTS_PATH)
 print(f"Loaded weights from {WEIGHTS_PATH}")
 
-# ── Pygame init ─────────────────────────────────────────────
+# Pygame init
 pg.init()
 screen = pg.display.set_mode((WIDTH, HEIGHT))
 pg.display.set_caption("Breakout — Agent Evaluation")
 clock = pg.time.Clock()
+
+# Jupyter display
+img_widget = widgets.Image(format='jpeg', width=WIDTH, height=HEIGHT)
+display(img_widget)
+
+
+def render_frame():
+    frame   = np.transpose(pg.surfarray.array3d(screen), (1, 0, 2))
+    pil_img = Image.fromarray(frame)
+    buf     = io.BytesIO()
+    pil_img.save(buf, format='JPEG', quality=70)
+    img_widget.value = buf.getvalue()
+
 
 for ep in range(NUM_EPISODES):
     pad    = Paddle(paddle_x, paddle_y)
@@ -46,11 +82,9 @@ for ep in range(NUM_EPISODES):
 
     while not done and step < MAX_STEPS:
         for event in pg.event.get():
-            if event.type == pg.QUIT:
-                pg.quit()
-                sys.exit()
+            pass
 
-        # ── Action (eps1 exploration, same as training) ─────
+        # Action (eps1 exploration, same as training)
         if np.random.rand() < EPS1:
             q_vals = q_net.predict_single(state)
             action = int(np.argmax(q_vals))
@@ -62,7 +96,7 @@ for ep in range(NUM_EPISODES):
         elif action != 1:
             pad.move_right()
 
-        # ── Physics (identical order to training) ───────────
+        # Physics (identical order to training)
         invaded = bricks.invade_update(pad.rect)
 
         ball.move()
@@ -71,7 +105,7 @@ for ep in range(NUM_EPISODES):
 
         ball_rect = pg.Rect(
             int(ball.x - ball.radius), int(ball.y - ball.radius),
-            ball.radius * 2, ball.radius * 2
+            ball.radius * 2, ball.radius * 2,
         )
         paddle_hit = False
         if ball_rect.colliderect(pad.rect) and ball.y_speed > 0:
@@ -89,7 +123,7 @@ for ep in range(NUM_EPISODES):
 
         ball_lost = ball.y + ball.radius >= HEIGHT
 
-        # ── Reward (same as training, for display only) ─────
+        # Reward (same as training, for display only)
         reward = 0.0
         if brick_hit:
             reward += 2.0
@@ -110,14 +144,20 @@ for ep in range(NUM_EPISODES):
         total_reward += reward
         step += 1
 
-        # Render
+        # Render to Jupyter widget
         screen.fill(BG_COLOR)
         score.show_scores()
         pad.appear(screen)
         bricks.show_bricks()
         pg.draw.circle(screen, ball_color, (int(ball.x), int(ball.y)), ball.radius)
         pg.display.flip()
+
+        if step % FRAME_SKIP == 0:
+            render_frame()
         clock.tick(60)
+
+    # Final frame for this episode
+    render_frame()
 
     print(f"Episode {ep+1}: Score={score.score}  Reward={total_reward:.1f}  "
           f"Steps={step}  BricksLeft={bricks.bricks_left()}")

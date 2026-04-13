@@ -1,9 +1,9 @@
-# ── headless pygame setup (must be BEFORE any pygame import) ──────────────────
+# headless pygame setup (must be BEFORE any pygame import)
 import os
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 os.environ["SDL_AUDIODRIVER"] = "dummy"
 
-# ── standard imports ───────────────────────────────────────────────────────────
+# standard imports
 import pygame as pg
 import numpy as np
 from IPython.display import display, clear_output
@@ -18,7 +18,7 @@ from settings import *
 from scoreboard import ScoreBoard
 from encoder import encode_game
 
-# ── try to import PYNQ buttons (won't crash if not available) ─────────────────
+# try to import PYNQ buttons (won't crash if not available)
 try:
     from pynq.overlays.base import BaseOverlay
     base = BaseOverlay("base.bit")
@@ -30,13 +30,13 @@ except Exception:
     USE_PYNQ_BUTTONS = False
     print("No PYNQ buttons found — AI/manual mode only.")
 
-# ── pygame init ────────────────────────────────────────────────────────────────
+# pygame init
 pg.init()
 screen = pg.display.set_mode((WIDTH, HEIGHT))
 pg.display.set_caption("Breakout Game")
 clock = pg.time.Clock()
 
-# ── game objects ───────────────────────────────────────────────────────────────
+# game objects
 pad    = Paddle(paddle_x, paddle_y)
 ball   = Ball(ball_x, ball_y, screen)
 bricks = Bricks(bricks_per_row, bricks_per_col, screen)
@@ -50,7 +50,7 @@ running  = True
 RENDER_EVERY = 3   # show every Nth frame (raise to speed up, lower for smoothness)
 frame_count  = 0
 
-# ── widget buttons for manual control ─────────────────────────────────────────
+# widget buttons for manual control
 btn_left  = widgets.Button(description="◀ Left",  button_style="info")
 btn_right = widgets.Button(description="Right ▶", button_style="info")
 btn_restart = widgets.Button(description="Restart (0)", button_style="warning")
@@ -78,7 +78,7 @@ img_widget = widgets.Image(format='jpeg', width=WIDTH, height=HEIGHT)
 display(widgets.HBox([btn_left, btn_right, btn_restart]))
 display(img_widget)
 
-# ── main loop ─────────────────────────────────────────────────────────────────
+# main loop
 while running:
     screen.fill(BG_COLOR)
     score.show_scores()
@@ -112,7 +112,7 @@ while running:
             bricks.reset_all()
             gameover = True
 
-        # ── paddle control: PYNQ buttons → widget buttons → AI ───────────────
+        # paddle control: PYNQ buttons → widget buttons → AI
         if USE_PYNQ_BUTTONS:
             if btn0.read():
                 pad.move_right()
@@ -131,7 +131,7 @@ while running:
 
     bricks.show_bricks()
 
-    # ── handle pygame events (quit / restart) ──────────────────────────────────
+    # handle pygame events (quit / restart)
     for event in pg.event.get():
         if event.type == pg.QUIT:
             running = False
@@ -145,7 +145,7 @@ while running:
             ball.y      = ball_y
             ball.y_speed = -abs(ball.y_speed)
 
-    # ── render frame into notebook ─────────────────────────────────────────────
+    # render frame into notebook
     frame_count += 1
     if frame_count % RENDER_EVERY == 0:
         frame = np.transpose(pg.surfarray.array3d(screen), (1, 0, 2))
